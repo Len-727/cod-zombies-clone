@@ -1,8 +1,6 @@
 // Game.h - ゲームクラス定義（構造を理解しよう）
 #pragma once
 
-#include "Entities.h"
-#include "WeaponSystem.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
@@ -45,12 +43,11 @@ public:
     void OnWindowSizeChanged(int width, int height);      // ウィンドウサイズ変更
 
 private:
-    std::unique_ptr<WeaponSystem> m_weaponSystem;
     // === ゲームループの内部処理 ===
     void Update();     // ゲームロジック更新
     void Render();     // 描画処理
 
-    
+
     void Clear();
     void CreateDevice();
     void CreateResources();
@@ -58,7 +55,7 @@ private:
     void CreateExplosion(DirectX::XMFLOAT3 position);
     void CreateMuzzleFlash();
     void CreateMuzzleParticles();
-    
+
     void DrawGrid();
     //void DrawCubes();
     //void DrawHealthBar(DirectX::PrimitiveBatch<DirectX::VertexPositionColor>* batch);
@@ -68,10 +65,10 @@ private:
     void DrawEnemies();
     void DrawUI();
     void DrawSimpleNumber(DirectX::PrimitiveBatch<DirectX::VertexPositionColor>* batch, int digit, float x, float y, DirectX::XMFLOAT4 color);
-    
-    
+
+
     void SpawnEnemy();
-    
+
     void UpdateTitle();
     void UpdatePlaying();
     void UpdateGameOver();
@@ -117,8 +114,8 @@ private:
     std::unique_ptr<DirectX::BasicEffect>       m_effect;
     Microsoft::WRL::ComPtr<ID3D11InputLayout>   m_inputLayout;
     std::unique_ptr<DirectX::GeometricPrimitive> m_cube;
-    
-    
+
+
     std::unique_ptr<DirectX::GeometricPrimitive> m_weaponModel;
     //std::unique_ptr<DirectX::GeometricPrimitive> m_muzzleFlashModel;
     float m_weaponSwayX;
@@ -126,23 +123,58 @@ private:
     float m_lastCameraRotX;
     float m_lastCameraRotY;
 
-  
+    //  パーティクルエフェクト用
+    struct Particle {
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT3 velocity;
+        DirectX::XMFLOAT4 color;
+        float lifetime;
+        float maxLifetime;
+    };
     std::vector<Particle> m_particles;
     bool m_showMuzzleFlash;
     float m_muzzleFlashTimer;
-    
-   
+
+    struct Enemy {
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT3 velocity;
+        DirectX::XMFLOAT4 color;
+        bool isAlive;
+        float moveTimer;
+        float nextDirectionChange;
+        int health;
+        int maxHealth;
+    };
     std::vector<Enemy> m_enemies;
     float m_enemySpawnTimer = 0.0f;
     int m_maxEnemies;
 
-   
+    enum class WeaponType {
+        PISTOL,     // M1911 - 初期武器
+        SHOTGUN,    // Olympia - 近距離
+        RIFLE,      // M14 - 中距離
+        SNIPER      // DSR - 遠距離
+    };
 
-   
+    // 武器データ構造
+    struct WeaponData {
+        WeaponType type;
+        int damage;
+        int maxAmmo;
+        int reserveAmmo;
+        float fireRate;      // 連射速度（秒）
+        float range;         // 有効射程
+        int penetration;     // 貫通数
+        float reloadTime;    // リロード時間
+        int cost;           // 購入価格
+    };
 
-    
 
-    
+    WeaponType m_currentWeapon;
+    std::map<WeaponType, WeaponData> m_weaponStats;
+    float m_fireRateTimer;
+
+    void SwitchWeapon(WeaponType newWeapon);
 
 
     std::unique_ptr<DirectX::SpriteBatch> m_spriteBatch;
@@ -162,7 +194,11 @@ private:
     DirectX::XMFLOAT3 m_damageDisplayPos;
     int m_damageValue;
 
-   
+    enum class GameState {
+        TITLE,
+        PLAYING,
+        GAMEOVER
+    };
 
     GameState m_gameState;
     float m_fadeAlpha;
@@ -190,10 +226,28 @@ private:
     //  UI用
     std::unique_ptr<DirectX::SpriteFont> m_font;
     std::unique_ptr<DirectX::SpriteFont> m_fontLarge;
-   
 
-   
 
-    
+    //  武器システム
+    int m_currentAmmo; // 現在の弾数
+    int m_maxAmmo;// 最大弾数
+    int m_reserveAmmo;// 予備弾数
+    bool m_isReloading;// リロード中フラグ
+    float m_reloadTimer;// リロードタイマー
+
+    // 武器スロット（最大2つ）
+    WeaponType m_primaryWeapon;
+    WeaponType m_secondaryWeapon;
+    int m_currentWeaponSlot;  // 0=primary, 1=secondary
+    bool m_hasSecondaryWeapon;  // 2つ目の武器を持っているか
+    void BuyWeapon(WeaponType weaponType);
+
+    // 武器ごとの弾薬状態
+    struct WeaponAmmo {
+        int currentAmmo;
+        int reserveAmmo;
+    };
+
+    std::map<WeaponType, WeaponAmmo> m_weaponAmmoStatus;
 
 };

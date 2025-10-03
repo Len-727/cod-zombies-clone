@@ -63,7 +63,7 @@ Game::Game() noexcept :
     m_primaryWeapon(WeaponType::PISTOL),
     m_fireRateTimer(0.0f)
 {
-    
+
     // 武器データの設定
     m_weaponStats[WeaponType::PISTOL] = {
         WeaponType::PISTOL, 30, 8, 80, 0.2f, 50.0f, 1, 1.5f, 0
@@ -84,7 +84,6 @@ Game::Game() noexcept :
     // 初期武器（ピストル）の弾薬を設定
     m_currentAmmo = m_weaponAmmoStatus[WeaponType::PISTOL].currentAmmo;
     m_reserveAmmo = m_weaponAmmoStatus[WeaponType::PISTOL].reserveAmmo;
-    m_maxAmmo = m_weaponStats[WeaponType::PISTOL].maxAmmo;
 
     static bool firstFrame = true;
     if (firstFrame && m_gameState == GameState::PLAYING)
@@ -138,13 +137,13 @@ void Game::Update()
 
 
 
-    
+
 
 }
 
 void Game::Clear()
 {
-    
+
 
     m_d3dContext->ClearRenderTargetView(m_renderTargetView.Get(), Colors::Blue);
     // Colors::Red, Colors::Green, Colors::Black なども試してみよう
@@ -310,7 +309,7 @@ void Game::CreateRenderResources()
 
     // フォントファイルを読み込む
     //m_font = std::make_unique<DirectX::SpriteFont>(m_d3dDevice.Get(), L"Arial.spritefont");
-    
+
 }
 
 void Game::CreateExplosion(DirectX::XMFLOAT3 position)
@@ -628,7 +627,7 @@ void Game::DrawGrid()
     }
 
     primitiveBatch->End();
- }
+}
 
 //void Game::DrawCubes()
 //{
@@ -671,94 +670,94 @@ void Game::DrawGrid()
 //    }
 //}
 
- void Game::DrawEnemies()
- {
-     // ビュー・プロジェクション行列の計算
-     DirectX::XMVECTOR cameraPosition = DirectX::XMLoadFloat3(&m_cameraPos);
-     DirectX::XMVECTOR cameraTarget = DirectX::XMVectorSet(
-         m_cameraPos.x + sinf(m_cameraRot.y) * cosf(m_cameraRot.x),
-         m_cameraPos.y - sinf(m_cameraRot.x),
-         m_cameraPos.z + cosf(m_cameraRot.y) * cosf(m_cameraRot.x),
-         0.0f
-     );
-     DirectX::XMVECTOR upVector = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-     DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(cameraPosition, cameraTarget, upVector);
+void Game::DrawEnemies()
+{
+    // ビュー・プロジェクション行列の計算
+    DirectX::XMVECTOR cameraPosition = DirectX::XMLoadFloat3(&m_cameraPos);
+    DirectX::XMVECTOR cameraTarget = DirectX::XMVectorSet(
+        m_cameraPos.x + sinf(m_cameraRot.y) * cosf(m_cameraRot.x),
+        m_cameraPos.y - sinf(m_cameraRot.x),
+        m_cameraPos.z + cosf(m_cameraRot.y) * cosf(m_cameraRot.x),
+        0.0f
+    );
+    DirectX::XMVECTOR upVector = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(cameraPosition, cameraTarget, upVector);
 
-     float aspectRatio = (float)m_outputWidth / (float)m_outputHeight;
-     DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
-         DirectX::XMConvertToRadians(70.0f), aspectRatio, 0.1f, 1000.0f
-     );
+    float aspectRatio = (float)m_outputWidth / (float)m_outputHeight;
+    DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
+        DirectX::XMConvertToRadians(70.0f), aspectRatio, 0.1f, 1000.0f
+    );
 
-     // 敵を描画
-     for (const auto& enemy : m_enemies)
-     {
-         if (!enemy.isAlive)
-             continue;
+    // 敵を描画
+    for (const auto& enemy : m_enemies)
+    {
+        if (!enemy.isAlive)
+            continue;
 
-         DirectX::XMMATRIX world = DirectX::XMMatrixTranslation(
-             enemy.position.x, enemy.position.y, enemy.position.z
-         );
+        DirectX::XMMATRIX world = DirectX::XMMatrixTranslation(
+            enemy.position.x, enemy.position.y, enemy.position.z
+        );
 
-         DirectX::XMVECTOR color = DirectX::XMLoadFloat4(&enemy.color);
-         m_cube->Draw(world, viewMatrix, projectionMatrix, color);
-     }
+        DirectX::XMVECTOR color = DirectX::XMLoadFloat4(&enemy.color);
+        m_cube->Draw(world, viewMatrix, projectionMatrix, color);
+    }
 
-     // HPバーを描画
-     auto context = m_d3dContext.Get();
-     m_effect->SetView(viewMatrix);
-     m_effect->SetProjection(projectionMatrix);
-     m_effect->SetWorld(DirectX::XMMatrixIdentity());
-     m_effect->SetVertexColorEnabled(true);
-     m_effect->SetDiffuseColor(DirectX::Colors::White);
-     m_effect->Apply(context);
-     context->IASetInputLayout(m_inputLayout.Get());
+    // HPバーを描画
+    auto context = m_d3dContext.Get();
+    m_effect->SetView(viewMatrix);
+    m_effect->SetProjection(projectionMatrix);
+    m_effect->SetWorld(DirectX::XMMatrixIdentity());
+    m_effect->SetVertexColorEnabled(true);
+    m_effect->SetDiffuseColor(DirectX::Colors::White);
+    m_effect->Apply(context);
+    context->IASetInputLayout(m_inputLayout.Get());
 
-     auto primitiveBatch = std::make_unique<DirectX::PrimitiveBatch<DirectX::VertexPositionColor>>(context);
-     primitiveBatch->Begin();
+    auto primitiveBatch = std::make_unique<DirectX::PrimitiveBatch<DirectX::VertexPositionColor>>(context);
+    primitiveBatch->Begin();
 
-     for (const auto& enemy : m_enemies)
-     {
-         if (!enemy.isAlive || enemy.health >= enemy.maxHealth)
-             continue;
+    for (const auto& enemy : m_enemies)
+    {
+        if (!enemy.isAlive || enemy.health >= enemy.maxHealth)
+            continue;
 
-         // HPバーの位置（敵の上）
-         float barWidth = 1.0f;
-         float barHeight = 0.1f;
-         float healthPercent = (float)enemy.health / enemy.maxHealth;
+        // HPバーの位置（敵の上）
+        float barWidth = 1.0f;
+        float barHeight = 0.1f;
+        float healthPercent = (float)enemy.health / enemy.maxHealth;
 
-         DirectX::XMFLOAT3 barCenter = enemy.position;
-         barCenter.y += 2.5f;
+        DirectX::XMFLOAT3 barCenter = enemy.position;
+        barCenter.y += 2.5f;
 
-         // 背景（赤）
-         DirectX::XMFLOAT4 bgColor(0.5f, 0.0f, 0.0f, 1.0f);
-         primitiveBatch->DrawLine(
-             DirectX::VertexPositionColor(
-                 DirectX::XMFLOAT3(barCenter.x - barWidth / 2, barCenter.y, barCenter.z),
-                 bgColor
-             ),
-             DirectX::VertexPositionColor(
-                 DirectX::XMFLOAT3(barCenter.x + barWidth / 2, barCenter.y, barCenter.z),
-                 bgColor
-             )
-         );
+        // 背景（赤）
+        DirectX::XMFLOAT4 bgColor(0.5f, 0.0f, 0.0f, 1.0f);
+        primitiveBatch->DrawLine(
+            DirectX::VertexPositionColor(
+                DirectX::XMFLOAT3(barCenter.x - barWidth / 2, barCenter.y, barCenter.z),
+                bgColor
+            ),
+            DirectX::VertexPositionColor(
+                DirectX::XMFLOAT3(barCenter.x + barWidth / 2, barCenter.y, barCenter.z),
+                bgColor
+            )
+        );
 
-         // HP部分（明るい赤）
-         DirectX::XMFLOAT4 hpColor(1.0f, 0.0f, 0.0f, 1.0f);
-         float currentBarWidth = barWidth * healthPercent;
-         primitiveBatch->DrawLine(
-             DirectX::VertexPositionColor(
-                 DirectX::XMFLOAT3(barCenter.x - barWidth / 2, barCenter.y + 0.05f, barCenter.z),
-                 hpColor
-             ),
-             DirectX::VertexPositionColor(
-                 DirectX::XMFLOAT3(barCenter.x - barWidth / 2 + currentBarWidth, barCenter.y + 0.05f, barCenter.z),
-                 hpColor
-             )
-         );
-     }
+        // HP部分（明るい赤）
+        DirectX::XMFLOAT4 hpColor(1.0f, 0.0f, 0.0f, 1.0f);
+        float currentBarWidth = barWidth * healthPercent;
+        primitiveBatch->DrawLine(
+            DirectX::VertexPositionColor(
+                DirectX::XMFLOAT3(barCenter.x - barWidth / 2, barCenter.y + 0.05f, barCenter.z),
+                hpColor
+            ),
+            DirectX::VertexPositionColor(
+                DirectX::XMFLOAT3(barCenter.x - barWidth / 2 + currentBarWidth, barCenter.y + 0.05f, barCenter.z),
+                hpColor
+            )
+        );
+    }
 
-     primitiveBatch->End();
- }
+    primitiveBatch->End();
+}
 
 bool Game::CheckRayHitsKube(DirectX::XMFLOAT3 rayStart, DirectX::XMFLOAT3 rayDir, DirectX::XMFLOAT3 cubePos)
 {
@@ -908,7 +907,7 @@ void Game::UpdateTitle()
         m_fadeActive = true;
     }
 
-    
+
 }
 
 void Game::DrawWeapon()
@@ -974,7 +973,7 @@ void Game::DrawWeapon()
     //    m_muzzleFlashModel->Draw(flashWorld, viewMatrix, projectionMatrix, DirectX::Colors::Yellow);
     //}
 
-   
+
 }
 
 
@@ -1354,7 +1353,7 @@ void Game::UpdatePlaying()
         m_lastMouseY = mousePos.y;
     }
 
-   
+
     // --- 1回押した時だけ反応するキー入力の管理 ---
     static std::map<int, bool> keyWasPressed;
     auto IsFirstKeyPress = [&](int vk_code) {
@@ -1409,11 +1408,6 @@ void Game::UpdatePlaying()
     }
 
 
-    //  射撃タイマー更新
-    if (m_fireRateTimer > 0.0f) {
-        m_fireRateTimer -= 1.0f / 60.0f;
-    }
-
 
     //  カメラ回転の変化量から武器の揺れを計算
     float rotationDeltaX = m_cameraRot.x - m_lastCameraRotX;
@@ -1432,7 +1426,7 @@ void Game::UpdatePlaying()
     m_lastCameraRotX = m_cameraRot.x;
     m_lastCameraRotY = m_cameraRot.y;
 
-   
+
 
 
     if (m_mouseCaptured)
@@ -1574,20 +1568,20 @@ void Game::UpdatePlaying()
         }
     }
 
-    
+
     UpdateParticles();
     UpdateEnemies();
 
 
     // ダメージタイマー更新
-        if (m_damageTimer > 0.0f)
+    if (m_damageTimer > 0.0f)
+    {
+        m_damageTimer -= 1.0f / 60.0f;
+        if (m_damageTimer <= 0.0f)
         {
-            m_damageTimer -= 1.0f / 60.0f;
-            if (m_damageTimer <= 0.0f)
-            {
-                m_isDamaged = false;
-            }
+            m_isDamaged = false;
         }
+    }
 
 }
 
