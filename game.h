@@ -2,6 +2,7 @@
 #pragma once
 
 #include <windows.h>
+#include "Entities.h"
 #include <d3d11.h>
 #include <dxgi.h>
 #include <DirectXMath.h>
@@ -123,51 +124,19 @@ private:
     float m_lastCameraRotX;
     float m_lastCameraRotY;
 
-    //  パーティクルエフェクト用
-    struct Particle {
-        DirectX::XMFLOAT3 position;
-        DirectX::XMFLOAT3 velocity;
-        DirectX::XMFLOAT4 color;
-        float lifetime;
-        float maxLifetime;
-    };
+    
     std::vector<Particle> m_particles;
     bool m_showMuzzleFlash;
     float m_muzzleFlashTimer;
 
-    struct Enemy {
-        DirectX::XMFLOAT3 position;
-        DirectX::XMFLOAT3 velocity;
-        DirectX::XMFLOAT4 color;
-        bool isAlive;
-        float moveTimer;
-        float nextDirectionChange;
-        int health;
-        int maxHealth;
-    };
+   
     std::vector<Enemy> m_enemies;
     float m_enemySpawnTimer = 0.0f;
     int m_maxEnemies;
 
-    enum class WeaponType {
-        PISTOL,     // M1911 - 初期武器
-        SHOTGUN,    // Olympia - 近距離
-        RIFLE,      // M14 - 中距離
-        SNIPER      // DSR - 遠距離
-    };
+    
 
-    // 武器データ構造
-    struct WeaponData {
-        WeaponType type;
-        int damage;
-        int maxAmmo;
-        int reserveAmmo;
-        float fireRate;      // 連射速度（秒）
-        float range;         // 有効射程
-        int penetration;     // 貫通数
-        float reloadTime;    // リロード時間
-        int cost;           // 購入価格
-    };
+    
 
 
     WeaponType m_currentWeapon;
@@ -194,11 +163,7 @@ private:
     DirectX::XMFLOAT3 m_damageDisplayPos;
     int m_damageValue;
 
-    enum class GameState {
-        TITLE,
-        PLAYING,
-        GAMEOVER
-    };
+   
 
     GameState m_gameState;
     float m_fadeAlpha;
@@ -241,12 +206,6 @@ private:
     int m_currentWeaponSlot;  // 0=primary, 1=secondary
     bool m_hasSecondaryWeapon;  // 2つ目の武器を持っているか
     void BuyWeapon(WeaponType weaponType);
-
-    // 武器ごとの弾薬状態
-    struct WeaponAmmo {
-        int currentAmmo;
-        int reserveAmmo;
-    };
 
     std::map<WeaponType, WeaponAmmo> m_weaponAmmoStatus;
 
