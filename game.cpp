@@ -54,37 +54,8 @@ Game::Game() noexcept :
     m_damageTimer(0.0f),
     m_isDamaged(false),
     m_points(500),
-    m_currentAmmo(30),
-    m_maxAmmo(30),
-    m_reserveAmmo(90),
-    m_isReloading(false),
-    m_reloadTimer(0.0f),
-    m_currentWeapon(WeaponType::PISTOL),
-    m_primaryWeapon(WeaponType::PISTOL),
-    m_fireRateTimer(0.0f)
+    m_weaponSystem(std::make_unique<WeaponSystem>())
 {
-
-    // 武器データの設定
-    m_weaponStats[WeaponType::PISTOL] = {
-        WeaponType::PISTOL, 30, 8, 80, 0.2f, 50.0f, 1, 1.5f, 0
-    };
-    m_weaponStats[WeaponType::SHOTGUN] = {
-        WeaponType::SHOTGUN, 200, 2, 60, 0.8f, 10.0f, 1, 2.5f, 500
-    };
-    m_weaponStats[WeaponType::RIFLE] = {
-        WeaponType::RIFLE, 18, 30, 180, 1.0f, 80, 1, 2.1f, 1000
-    };
-
-    // 各武器の初期弾薬状態を設定
-    m_weaponAmmoStatus[WeaponType::PISTOL] = { 8, 80 };
-    m_weaponAmmoStatus[WeaponType::SHOTGUN] = { 2, 60 };
-    m_weaponAmmoStatus[WeaponType::RIFLE] = { 20, 180 };
-    m_weaponAmmoStatus[WeaponType::SNIPER] = { 5, 50 };
-
-    // 初期武器（ピストル）の弾薬を設定
-    m_currentAmmo = m_weaponAmmoStatus[WeaponType::PISTOL].currentAmmo;
-    m_reserveAmmo = m_weaponAmmoStatus[WeaponType::PISTOL].reserveAmmo;
-
     static bool firstFrame = true;
     if (firstFrame && m_gameState == GameState::PLAYING)
     {
@@ -1110,20 +1081,53 @@ void Game::DrawUI()
 
     // (5) 弾薬の描画 (右下)
     {
-        DirectX::XMFLOAT4 color(1.0f, 1.0f, 1.0f, 1.0f); DirectX::XMFLOAT4 reloadingColor(1.0f, 0.2f, 0.2f, 1.0f);
-        float digitHeight = 25.0f; float digitWidth = 15.0f; float digitSpacing = 20.0f; float separatorWidth = 20.0f; float padding = 50.0f;
-        DirectX::XMFLOAT4 currentColor = m_isReloading ? reloadingColor : color;
-        std::string currentAmmoStr = std::to_string(m_currentAmmo); std::string reserveAmmoStr = std::to_string(m_reserveAmmo);
+        DirectX::XMFLOAT4 color(1.0f, 1.0f, 1.0f, 1.0f);
+        DirectX::XMFLOAT4 reloadingColor(1.0f, 0.2f, 0.2f, 1.0f);
+        float digitHeight = 25.0f;
+        float digitWidth = 15.0f;
+        float digitSpacing = 20.0f;
+        float separatorWidth = 20.0f;
+        float padding = 50.0f;
+
+        // リロード中なら赤色に変更
+        DirectX::XMFLOAT4 currentColor = m_weaponSystem->IsReloading() ? reloadingColor : color;
+
+        // 弾薬数を取得
+        std::string currentAmmoStr = std::to_string(m_weaponSystem->GetCurrentAmmo());
+        std::string reserveAmmoStr = std::to_string(m_weaponSystem->GetReserveAmmo());
+
         float currentWidth = currentAmmoStr.length() * digitWidth + (currentAmmoStr.length() - 1) * (digitSpacing - digitWidth);
         float reserveWidth = reserveAmmoStr.length() * digitWidth + (reserveAmmoStr.length() - 1) * (digitSpacing - digitWidth);
         float totalWidth = currentWidth + separatorWidth + reserveWidth;
-        float startX = m_outputWidth - padding - totalWidth; float startY = m_outputHeight - padding - digitHeight;
+        float startX = m_outputWidth - padding - totalWidth;
+        float startY = m_outputHeight - padding - digitHeight;
+
+        // デバッグ：リロード状態を確認
+        bool isReloading = m_weaponSystem->IsReloading();
+        char debugMsg[256];
+        sprintf_s(debugMsg, "DrawUI時点でリロード中: %s\n", isReloading ? "YES" : "NO");
+        OutputDebugStringA(debugMsg);
+
+        // 現在弾数を描画（リロード中なら赤）
         float currentX = startX;
-        for (char c : currentAmmoStr) { DrawSimpleNumber(primitiveBatch.get(), c - '0', currentX, startY, currentColor); currentX += digitSpacing; }
+        for (char c : currentAmmoStr) {
+            DrawSimpleNumber(primitiveBatch.get(), c - '0', currentX, startY, currentColor);  // ← currentColor使用
+            currentX += digitSpacing;
+        }
+
+        // スラッシュ（白）
         currentX += (separatorWidth - digitSpacing) / 2;
-        primitiveBatch->DrawLine(DirectX::VertexPositionColor(DirectX::XMFLOAT3(currentX, startY + digitHeight, 1.0f), color), DirectX::VertexPositionColor(DirectX::XMFLOAT3(currentX + 10.0f, startY, 1.0f), color));
+        primitiveBatch->DrawLine(
+            DirectX::VertexPositionColor(DirectX::XMFLOAT3(currentX, startY + digitHeight, 1.0f), color),
+            DirectX::VertexPositionColor(DirectX::XMFLOAT3(currentX + 10.0f, startY, 1.0f), color)
+        );
+
+        // 予備弾数を描画（常に白）
         currentX += separatorWidth - (separatorWidth - digitSpacing) / 2;
-        for (char c : reserveAmmoStr) { DrawSimpleNumber(primitiveBatch.get(), c - '0', currentX, startY, color); currentX += digitSpacing; }
+        for (char c : reserveAmmoStr) {
+            DrawSimpleNumber(primitiveBatch.get(), c - '0', currentX, startY, color);  // ← color使用
+            currentX += digitSpacing;
+        }
     }
 
     // (6) 現在の武器名表示（中央下）
@@ -1132,8 +1136,8 @@ void Game::DrawUI()
         float centerX = m_outputWidth / 2.0f;
         float bottomY = m_outputHeight - 120.0f;
 
-        // 武器名をシンプルに表示（W=Weapon, 1-4の数字で表現）
-        int weaponNum = (int)m_currentWeapon + 1;
+        // 現在の武器番号を取得
+        int weaponNum = (int)m_weaponSystem->GetCurrentWeapon() + 1;
         DrawSimpleNumber(primitiveBatch.get(), weaponNum, centerX - 30, bottomY, weaponColor);
     }
 
@@ -1159,80 +1163,13 @@ void Game::DrawSimpleNumber(DirectX::PrimitiveBatch<DirectX::VertexPositionColor
     case 9: DrawThickLine(x, y, x + w, y); DrawThickLine(x, y, x, y + h / 2); DrawThickLine(x + w, y, x + w, y + h); DrawThickLine(x, y + h / 2, x + w, y + h / 2); DrawThickLine(x, y + h, x + w, y + h); break;
     }
 }
-void Game::SwitchWeapon(WeaponType newWeapon)
-{
-    // 現在の武器の弾薬を保存
-    m_weaponAmmoStatus[m_currentWeapon] = { m_currentAmmo, m_reserveAmmo };
-
-    // 新しい武器に切り替え
-    m_currentWeapon = newWeapon;
-    auto& weapon = m_weaponStats[newWeapon];
-
-    // 保存されている弾薬を復元
-    m_currentAmmo = m_weaponAmmoStatus[newWeapon].currentAmmo;
-    m_reserveAmmo = m_weaponAmmoStatus[newWeapon].reserveAmmo;
-    m_maxAmmo = weapon.maxAmmo;
-
-    // タイマーなどをリセット
-    m_reloadTimer = 0.0f;
-    m_isReloading = false;
-}
-
-
-void Game::BuyWeapon(WeaponType weaponType)
-{
-    // 今持っている武器と同じなら、弾薬を満タンにする（弾薬購入）
-    if (m_currentWeapon == weaponType)
-    {
-        if (m_points >= m_weaponStats[weaponType].cost / 2) // 弾薬は半額
-        {
-            m_points -= m_weaponStats[weaponType].cost / 2;
-            m_reserveAmmo = m_weaponStats[weaponType].reserveAmmo;
-            m_weaponAmmoStatus[m_currentWeapon].reserveAmmo = m_reserveAmmo;
-        }
-        return;
-    }
-
-    // 既に所持している武器なら、それに切り替えるだけ
-    if (m_primaryWeapon == weaponType || (m_hasSecondaryWeapon && m_secondaryWeapon == weaponType))
-    {
-        SwitchWeapon(weaponType);
-        return;
-    }
-
-    // --- 新規購入処理 ---
-    int cost = m_weaponStats[weaponType].cost;
-    if (m_points < cost)
-        return;
-
-    m_points -= cost;
-
-    // 現在のスロットに新しい武器を上書き
-    if (m_currentWeaponSlot == 0) // プライマリスロット
-    {
-        m_primaryWeapon = weaponType;
-    }
-    else // セカンダリスロット
-    {
-        m_secondaryWeapon = weaponType;
-    }
-
-    // セカンダリ武器を初めて手に入れた時の処理
-    if (!m_hasSecondaryWeapon)
-    {
-        m_secondaryWeapon = WeaponType::PISTOL; // 古いプライマリをセカンダリに
-        m_hasSecondaryWeapon = true;
-    }
-
-    SwitchWeapon(weaponType);
-}
 
 void Game::UpdatePlaying()
 {
     char debug[256];
-    sprintf_s(debug, "Wave:%d | Points:%d | Health:%d | Kills:%d/%d",
+    sprintf_s(debug, "Wave:%d | Points:%d | Health:%d | Reloading:%s",
         m_currentWave, m_points, m_playerHealth,
-        m_enemiesKilledThisWave, m_totalEnemiesThisWave);
+        m_weaponSystem->IsReloading() ? "YES" : "NO");  // ← リロード状態を表示
     SetWindowTextA(m_window, debug);
 
     //  前後移動
@@ -1368,45 +1305,41 @@ void Game::UpdatePlaying()
         return false;
         };
 
-    if (IsFirstKeyPress('1') && !m_isReloading)
+    if (IsFirstKeyPress('1') && !m_weaponSystem->IsReloading())
     {
         // プレイヤーがピストルを所持しているか確認し、持っていればそのスロットに切り替える
-        if (m_primaryWeapon == WeaponType::PISTOL)
+        if (m_weaponSystem->GetPrimaryWeapon() == WeaponType::PISTOL)
         {
-            m_currentWeaponSlot = 0;
-            SwitchWeapon(WeaponType::PISTOL);
+            m_weaponSystem->SetCurrentWeaponSlot(0);
+            m_weaponSystem->SwitchWeapon(WeaponType::PISTOL);
         }
-        else if (m_hasSecondaryWeapon && m_secondaryWeapon == WeaponType::PISTOL)
+        else if (m_weaponSystem->HasSecondaryWeapon() &&
+                 m_weaponSystem->GetSecondaryWeapon() == WeaponType::PISTOL)
         {
-            m_currentWeaponSlot = 1;
-            SwitchWeapon(WeaponType::PISTOL);
+            m_weaponSystem->SetCurrentWeaponSlot(1);
+            m_weaponSystem->SwitchWeapon(WeaponType::PISTOL);
         }
         // 注: ピストルを両方のスロットから売ってしまった場合は何も起こらない
     }
-    if (IsFirstKeyPress('2') && !m_isReloading) {
-        BuyWeapon(WeaponType::SHOTGUN);
+    if (IsFirstKeyPress('2') && !m_weaponSystem->IsReloading()) {
+        m_weaponSystem->BuyWeapon(WeaponType::SHOTGUN, m_points);
     }
-    if (IsFirstKeyPress('3') && !m_isReloading) {
-        BuyWeapon(WeaponType::RIFLE);
+    if (IsFirstKeyPress('3') && !m_weaponSystem->IsReloading()) {
+        m_weaponSystem->BuyWeapon(WeaponType::RIFLE, m_points);
     }
-    if (IsFirstKeyPress('4') && !m_isReloading) {
-        BuyWeapon(WeaponType::SNIPER);
+    if (IsFirstKeyPress('4') && !m_weaponSystem->IsReloading()) {
+        m_weaponSystem->BuyWeapon(WeaponType::SNIPER, m_points);
     }
 
     // Qキーで武器スワップ
-    if (IsFirstKeyPress('Q') && m_hasSecondaryWeapon && !m_isReloading) {
-        // 現在のスロットとは逆のスロットに切り替える
-        m_currentWeaponSlot = 1 - m_currentWeaponSlot;
-        WeaponType newWeapon = (m_currentWeaponSlot == 0) ? m_primaryWeapon : m_secondaryWeapon;
-        SwitchWeapon(newWeapon);
+    if (IsFirstKeyPress('Q') && m_weaponSystem->HasSecondaryWeapon() && !m_weaponSystem->IsReloading()) {
+        int newSlot = 1 - m_weaponSystem->GetCurrentWeaponSlot();
+        m_weaponSystem->SetCurrentWeaponSlot(newSlot);
+        WeaponType newWeapon = (newSlot == 0) ?
+            m_weaponSystem->GetPrimaryWeapon() :
+            m_weaponSystem->GetSecondaryWeapon();
+        m_weaponSystem->SwitchWeapon(newWeapon);
     }
-
-    // Rキーでリロード開始
-    if (IsFirstKeyPress('R') && m_currentAmmo < m_maxAmmo && m_reserveAmmo > 0 && !m_isReloading) {
-        m_isReloading = true;
-        m_reloadTimer = m_weaponStats[m_currentWeapon].reloadTime;
-    }
-
 
 
     //  カメラ回転の変化量から武器の揺れを計算
@@ -1427,22 +1360,33 @@ void Game::UpdatePlaying()
     m_lastCameraRotY = m_cameraRot.y;
 
 
+    //  連射タイマー更新
+    if (m_weaponSystem->GetFireRateTimer() > 0.0f) {
+        m_weaponSystem->SetFireRateTimer(m_weaponSystem->GetFireRateTimer() - 1.0f / 60.0f);
+    }
 
-
+    //射撃処理
     if (m_mouseCaptured)
     {
         bool currentMouseState = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
-        if (currentMouseState && !m_lastMouseState && !m_isReloading && m_currentAmmo > 0 && m_fireRateTimer <= 0.0f)
+        if (currentMouseState && !m_lastMouseState &&
+            !m_weaponSystem->IsReloading() &&
+            m_weaponSystem->GetCurrentAmmo() > 0 &&
+            m_weaponSystem->GetFireRateTimer() <= 0.0f)
         {
-            auto& weapon = m_weaponStats[m_currentWeapon];
-            m_currentAmmo--;
-            m_fireRateTimer = weapon.fireRate;
+            auto& weapon = m_weaponSystem->GetWeaponData(m_weaponSystem->GetCurrentWeapon());
+
+            //  弾を消費
+            m_weaponSystem->SetCurrentAmmo(m_weaponSystem->GetCurrentAmmo() - 1);
+            m_weaponSystem->SetFireRateTimer(weapon.fireRate);
+            m_weaponSystem->SaveAmmoStatus();   //  弾薬状態を保存
+
             CreateMuzzleFlash();
-            m_weaponAmmoStatus[m_currentWeapon] = { m_currentAmmo, m_reserveAmmo };
+            
 
             // ショットガンは複数の弾を発射
-            int pellets = (m_currentWeapon == WeaponType::SHOTGUN) ? 8 : 1;
+            int pellets = (m_weaponSystem->GetCurrentWeapon() == WeaponType::SHOTGUN) ? 8 : 1;
             for (int p = 0; p < pellets; p++)
             {
                 // 射撃方向を計算
@@ -1455,7 +1399,7 @@ void Game::UpdatePlaying()
 
                 // 散弾の場合はランダムに広がる
                 DirectX::XMFLOAT3 shotDir = rayDir;
-                if (m_currentWeapon == WeaponType::SHOTGUN)
+                if (m_weaponSystem->GetCurrentWeapon() == WeaponType::SHOTGUN)
                 {
                     float spread = 0.1f;
                     shotDir.x += ((float)rand() / RAND_MAX - 0.5f) * spread;
@@ -1528,33 +1472,32 @@ void Game::UpdatePlaying()
         m_lastMouseState = currentMouseState;
     }
 
-
-    if (GetAsyncKeyState('R') & 0x8000 && m_currentAmmo < m_maxAmmo && m_reserveAmmo > 0 && !m_isReloading)
+    // Rキーでリロード開始
+    if (IsFirstKeyPress('R') &&
+        m_weaponSystem->GetCurrentAmmo() < m_weaponSystem->GetMaxAmmo() &&
+        m_weaponSystem->GetReserveAmmo() > 0 &&
+        !m_weaponSystem->IsReloading())
     {
-        if (m_reloadTimer <= 0.0f)
-        {
-            int needed = m_maxAmmo - m_currentAmmo;
-            int reload = min(needed, m_reserveAmmo);
-            m_currentAmmo += reload;
-            m_reserveAmmo -= reload;
-            m_isReloading = false;
-
-            m_weaponAmmoStatus[m_currentWeapon] = { m_currentAmmo, m_reserveAmmo };
-        }
+        m_weaponSystem->SetReloading(true);
+        auto& weapon = m_weaponSystem->GetWeaponData(m_weaponSystem->GetCurrentWeapon());
+        m_weaponSystem->SetReloadTimer(weapon.reloadTime);
     }
 
     // リロードタイマー更新
-    if (m_isReloading)
+    if (m_weaponSystem->IsReloading())
     {
-        m_reloadTimer -= 1.0f / 60.0f;
-        if (m_reloadTimer <= 0.0f)
+        float newTimer = m_weaponSystem->GetReloadTimer() - 1.0f / 60.0f;
+        m_weaponSystem->SetReloadTimer(newTimer);
+        if (newTimer <= 0.0f)
         {
             // リロード完了
-            int needed = m_maxAmmo - m_currentAmmo;
-            int reload = min(needed, m_reserveAmmo);
-            m_currentAmmo += reload;
-            m_reserveAmmo -= reload;
-            m_isReloading = false;
+            int needed = m_weaponSystem->GetMaxAmmo() - m_weaponSystem->GetCurrentAmmo();
+            int reload = min(needed, m_weaponSystem->GetReserveAmmo());
+
+            m_weaponSystem->SetCurrentAmmo(m_weaponSystem->GetCurrentAmmo() + reload);
+            m_weaponSystem->SetReserveAmmo(m_weaponSystem->GetReserveAmmo() - reload);
+            m_weaponSystem->SetReloading(false);
+            m_weaponSystem->SaveAmmoStatus();
         }
     }
 

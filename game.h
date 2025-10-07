@@ -2,7 +2,6 @@
 #pragma once
 
 #include <windows.h>
-#include "Entities.h"
 #include <d3d11.h>
 #include <dxgi.h>
 #include <DirectXMath.h>
@@ -27,6 +26,8 @@
 #include <WICTextureLoader.h>   // PNG/JPGなど
 #include <DDSTextureLoader.h>   // DDSテクスチャ
 #include <CommonStates.h>
+#include "Entities.h"
+#include "WeaponSystem.h"
 
 class Game
 {
@@ -44,6 +45,9 @@ public:
     void OnWindowSizeChanged(int width, int height);      // ウィンドウサイズ変更
 
 private:
+
+    std::unique_ptr<WeaponSystem> m_weaponSystem;   //  武器管理システム
+
     // === ゲームループの内部処理 ===
     void Update();     // ゲームロジック更新
     void Render();     // 描画処理
@@ -134,18 +138,6 @@ private:
     float m_enemySpawnTimer = 0.0f;
     int m_maxEnemies;
 
-    
-
-    
-
-
-    WeaponType m_currentWeapon;
-    std::map<WeaponType, WeaponData> m_weaponStats;
-    float m_fireRateTimer;
-
-    void SwitchWeapon(WeaponType newWeapon);
-
-
     std::unique_ptr<DirectX::SpriteBatch> m_spriteBatch;
 
 
@@ -191,22 +183,5 @@ private:
     //  UI用
     std::unique_ptr<DirectX::SpriteFont> m_font;
     std::unique_ptr<DirectX::SpriteFont> m_fontLarge;
-
-
-    //  武器システム
-    int m_currentAmmo; // 現在の弾数
-    int m_maxAmmo;// 最大弾数
-    int m_reserveAmmo;// 予備弾数
-    bool m_isReloading;// リロード中フラグ
-    float m_reloadTimer;// リロードタイマー
-
-    // 武器スロット（最大2つ）
-    WeaponType m_primaryWeapon;
-    WeaponType m_secondaryWeapon;
-    int m_currentWeaponSlot;  // 0=primary, 1=secondary
-    bool m_hasSecondaryWeapon;  // 2つ目の武器を持っているか
-    void BuyWeapon(WeaponType weaponType);
-
-    std::map<WeaponType, WeaponAmmo> m_weaponAmmoStatus;
 
 };
